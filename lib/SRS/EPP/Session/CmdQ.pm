@@ -1,0 +1,154 @@
+
+package SRS::EPP::Session::CmdQ;
+
+use Moose;
+use MooseX::Method::Signatures;
+use SRS::EPP::Command;
+use SRS::EPP::Response;
+
+has 'queue' =>
+	is => "ro",
+	isa => "ArrayRef[SRS::EPP::Command]",
+	default => sub { [] },
+	;
+
+has 'responses' =>
+	is => "ro",
+	isa => "ArrayRef[Maybe[SRS::EPP::Response]]",
+	default => sub { [] },
+	;
+
+has 'next' =>
+	is => "rw",
+	isa => "Num",
+	default => 0,
+	traits => ['Number'],
+	handles   => {
+		add_next => 'add',
+	},
+	;
+
+method next_command() {
+	my $q = $self->queue;
+	my $next = $self->next;
+	if ( my $item = $q->[$next] ) {
+		$self->add_next(1);
+		return $item;
+	}
+	else {
+		();
+	}
+}
+
+method commands_queued() {
+	my $q = $self->queue;
+	return scalar(@$q);
+}
+
+method queue_command( SRS::EPP::Command $cmd ) {
+	push @{ $self->queue }, $cmd;
+	push @{ $self->responses }, undef;
+}
+
+# with a command object, place a response at the same place in the queue
+method add_command_response( SRS::EPP::Response $response, SRS::EPP::Command $cmd? )
+{
+	my $q = $self->queue;
+	my $rs = $self->responses;
+	my $ok;
+	for ( my $i = 0; $i <= $#$q; $i++ ) {
+		if ( ($cmd and $q->[$i] == $cmd) or
+			!defined $rs->[$i] ) {
+			$rs->[$i] = $response;
+			$ok = 1;
+			last;
+		}
+	}
+	confess "Could not queue response, not found" if !$ok;
+}
+
+method response_ready() {
+	defined($self->responses->[0]);
+}
+
+method dequeue_response() {
+	if ( $self->response_ready ) {
+		my $cmd = shift @{ $self->queue };
+		my $response = shift @{ $self->responses };
+		$self->add_next(-1);
+		if ( wantarray ) {
+			($response, $cmd);
+		}
+		else {
+			$response;
+		}
+	}
+	else {
+		();
+	}
+}
+
+1;
+
+__END__
+
+=head1 NAME
+
+SRS::EPP::Session::CmdQ - manage epp command/response queue
+
+=head1 SYNOPSIS
+
+ my $q = SRS::EPP::Session::CmdQ->new( );
+
+ # put requests on queue
+ $q->queue_command( $epp_command );
+
+ # pull a command off the queue; mark it in progress
+ my @rq = $q->next_command;
+
+ # put a response in
+ $q->add_command_response( $epp_response, $epp_command? );
+
+ # if a message has had all its requests answered, it can be dequeued
+ ($epp_response, $epp_command) = $q->dequeue_response();
+
+ # also available in scalar context
+ $epp_response = $q->dequeue_response();
+
+=head1 DESCRIPTION
+
+This class implements a simple FIFO queue, but with small
+customizations to operation to suit the use case of the SRS EPP
+Proxy's queue of EPP commands and responses.
+
+=head1 SEE ALSO
+
+L<SRS::EPP::Session>
+
+=head1 AUTHOR AND LICENCE
+
+Development commissioned by NZ Registry Services, and carried out by
+Catalyst IT - L<http://www.catalyst.net.nz/>
+
+Copyright 2009, 2010, NZ Registry Services.  This module is licensed
+under the Artistic License v2.0, which permits relicensing under other
+Free Software licenses.
+
+=cut
+
+
+# Local Variables:
+# mode:cperl
+# indent-tabs-mode: t
+# cperl-continued-statement-offset: 8
+# cperl-brace-offset: 0
+# cperl-close-paren-offset: 0
+# cperl-continued-brace-offset: 0
+# cperl-continued-statement-offset: 8
+# cperl-extra-newline-before-brace: nil
+# cperl-indent-level: 8
+# cperl-indent-parens-as-block: t
+# cperl-indent-wrt-brace: nil
+# cperl-label-offset: -8
+# cperl-merge-trailing-else: t
+# End:
