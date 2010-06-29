@@ -31,14 +31,16 @@ sub rebless_class {
 				$_->can("match_class") ?
 					( $_->match_class => $_ )
 						: ();
-			} __PACKAGE__->plugins,
+			}# map { print "rebless_class checking plugin $_\n"; $_ }
+				grep m{${\(__PACKAGE__)}::[^:]*$},
+				__PACKAGE__->plugins,
 		};
 	}
 	$map->{ref $object};
 }
 
 sub action_class {
-	my $object = shift;
+	my $action = shift;
 	our $action_classes;
 	if ( !$action_classes ) {
 		$action_classes = {
@@ -46,13 +48,18 @@ sub action_class {
 				$_->can("action") ?
 					($_->action => $_)
 						: ();
-			} __PACKAGE__->plugins,
+			}# map { print "action_class checking plugin $_\n"; $_ }
+				grep m{^${\(__PACKAGE__)}::[^:]*$},
+			__PACKAGE__->plugins,
 		};
 	}
-	$action_classes->{ $object->action };
+	$action_classes->{ $action };
 }
 
-sub REBLESS { }
+sub REBLESS {
+
+}
+
 sub BUILD {
 	my $self = shift;
 	if ( my $epp = $self->message ) {
@@ -60,7 +67,7 @@ sub BUILD {
 		$class = rebless_class( $epp->message );
 		if ( !$class and $epp->message and
 			     $epp->message->can("action") ) {
-			$class = action_class($epp->message);
+			$class = action_class($epp->message->action);
 		}
 		if ( $class ) {
 			bless $self, $class;
@@ -110,9 +117,6 @@ method process( SRS::EPP::Session $session ) {
 		);
 }
 
-method to_srs() {
-	die("$self: EPP command must implement to_srs");
-}
 method notify( SRS::EPP::SRSResponse @rs ) {
 	my $result;
 	if ( my $server_id = eval {
@@ -215,6 +219,7 @@ L<SRS::EPP::Response>
 # Local Variables:
 # mode:cperl
 # indent-tabs-mode: t
+# tab-width: 8
 # cperl-continued-statement-offset: 8
 # cperl-brace-offset: 0
 # cperl-close-paren-offset: 0
