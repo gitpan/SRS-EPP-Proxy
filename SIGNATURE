@@ -1,0 +1,90 @@
+This file contains message digests of all files listed in MANIFEST,
+signed via the Module::Signature module, version 0.55.
+
+To verify the content in this distribution, first make sure you have
+Module::Signature installed, then type:
+
+    % cpansign -v
+
+It will check each file's integrity, as well as the signature's
+validity.  If "==> Signature verified OK! <==" is not displayed,
+the distribution may already have been compromised, and you should
+not run its Makefile.PL or Build.PL.
+
+-----BEGIN PGP SIGNED MESSAGE-----
+Hash: SHA1
+
+SHA1 5ebf20e77850b956f9f03833932a7005ba59f0d9 COPYING.txt
+SHA1 9284fe4b2f39e7fe6b178677f2b75059f564bb33 MANIFEST
+SHA1 cef25f6369c80be71c2b8815d12a96d6a71902f6 MANIFEST.SKIP
+SHA1 bc4473a72ed2e5fa65568dcec8f3b3c2a3d7f173 META.yml
+SHA1 aa2b9be2559c1aacc35820131bd7341d46a0a98f Makefile.PL
+SHA1 10bf509bdbd572b68539ad3c236a9924587503a3 README
+SHA1 e2c8cdca232639ee1128b07f62fc6fb8c25f03b5 SubmittingPatches
+SHA1 e75ea3699f7fbf2df15bcf95138b32cf10f16fab bin/srs-epp-proxy
+SHA1 1ebec4119486a032a5612a403e8d7b7be973e938 inc/Module/Install.pm
+SHA1 24038af925a69df41972971356ccce885b0fe2ad inc/Module/Install/Base.pm
+SHA1 8f96eddfef548c9328457fbb17a121631cda356b inc/Module/Install/Can.pm
+SHA1 ec29048e48edd9c9c55f9de7b773bd7c904335ad inc/Module/Install/Fetch.pm
+SHA1 0384525d85d51e99532e3ad8729d870113646d14 inc/Module/Install/Makefile.pm
+SHA1 38c657de4d91f5a60ff8e6c6f6a5547daf7c4ab2 inc/Module/Install/Metadata.pm
+SHA1 f74fc88b2820caf7c3e50a1108b377aa4abdb275 inc/Module/Install/Scripts.pm
+SHA1 5c25f1104c0038041e3b93e0660c39171e4caf2b inc/Module/Install/Win32.pm
+SHA1 94d47349c803c4bd2a9230d25e4db0b6aaf1acd8 inc/Module/Install/WriteAll.pm
+SHA1 a8106adfee8f03fd3e42da1a72d419516067dff8 lib/SRS/EPP/Command.pm
+SHA1 9a73eae7856fe1c2b3fdbdaf302ceb61a9c0624b lib/SRS/EPP/Command/Check.pm
+SHA1 91b530d3d67e6b2ea90d4da33aa9da4feb76433f lib/SRS/EPP/Command/Create.pm
+SHA1 90dd7248c29fea38a659f0a4725791be9bda92dd lib/SRS/EPP/Command/Delete.pm
+SHA1 6cb66332ba7944c0978f46dff3cf07ee0052ad77 lib/SRS/EPP/Command/Extension.pm
+SHA1 407c89495b266f953cdfa7e2a63293068db60e0a lib/SRS/EPP/Command/Hello.pm
+SHA1 df2a120ea7bebdd86178e8ea8a6eecf6660428ab lib/SRS/EPP/Command/Info.pm
+SHA1 9821492d08093df885f54cc57f11bdd7068ac3f6 lib/SRS/EPP/Command/Login.pm
+SHA1 60dc83ed817c4fc3cc20d372ec97534363697685 lib/SRS/EPP/Command/Logout.pm
+SHA1 3bc662ff5a05f037a5eb20456818544873c1656e lib/SRS/EPP/Command/Renew.pm
+SHA1 7371535c9292682bca5fa00bf684254e766e12f7 lib/SRS/EPP/Command/Update.pm
+SHA1 7612f8ee7221bb5212a9f483a5681d6d18c371dd lib/SRS/EPP/Message.pm
+SHA1 080f77d78e540d58d6fd2b79258acc2167934a2c lib/SRS/EPP/OpenPGP.pm
+SHA1 f5cb95d92187de519c46d191bb61bfac45950e7d lib/SRS/EPP/Packets.pm
+SHA1 5710d49de8696ccda8d187d7fc4f0e20c60000bb lib/SRS/EPP/Proxy.pm
+SHA1 bc76796213ea2845556b5980e30c0e9324193cfa lib/SRS/EPP/Proxy/ConfigFromFile.pm
+SHA1 987d03dc317cd8249aca35d3675a1316dcc0df9a lib/SRS/EPP/Proxy/Listener.pm
+SHA1 56aa91769771adf60e3f7df866e925ae7f986f09 lib/SRS/EPP/Proxy/SimpleConfig.pm
+SHA1 6b471313db625ef4be8b83ad1acbc8a16ea23350 lib/SRS/EPP/Proxy/UA.pm
+SHA1 d2c2386f83b5e1c0022eb6f46e50176e2b229ef6 lib/SRS/EPP/Response.pm
+SHA1 55daf28fa382fe3f279abdb20d57622c6f829cfd lib/SRS/EPP/Response/Error.pm
+SHA1 d78d8ba0e40e4b3f9d74c5febd428c3521c3388e lib/SRS/EPP/Response/Greeting.pm
+SHA1 d5a502567c08c8f620a3f87e2e93190faad95856 lib/SRS/EPP/SRSMessage.pm
+SHA1 b2c7277b58e91bc1f18f1d600441c99a9299faba lib/SRS/EPP/SRSRequest.pm
+SHA1 c9ef4751f6c5c29437b778485f3618e6d4d883d9 lib/SRS/EPP/SRSResponse.pm
+SHA1 0e64a262ee50dd53b3acf071b50904adf757ef4d lib/SRS/EPP/Session.pm
+SHA1 c7f8b26c079595ab1be8ded598d1a7720733557c lib/SRS/EPP/Session/BackendQ.pm
+SHA1 43cdb783ee4d31b7c47427df7b3f5af00ff793a5 lib/SRS/EPP/Session/CmdQ.pm
+SHA1 2253068b30428cebd5c1fc2c0abd6a9f51c22308 t/00-load.t
+SHA1 bc0af27fa1de96a0dd2baef54543433b8e645365 t/01-listener.t
+SHA1 662624d27bef624869b1d87d78b798e25dc8dcd9 t/02-packeter.t
+SHA1 05bd51aaf066b11e3dedc03a55200537e9bbb5cb t/02-packeter/example-stream.raw
+SHA1 b10dee6ab1eaac26eb9e373c5bb58339c85aa5fa t/03-messages.t
+SHA1 f6805f4eee6ed665bb11cf6f4318987e861a7d0e t/04-backend-queue.t
+SHA1 bdfef35801e2a4d8b87abf5b5d168b93a6f20c11 t/05-command-queue.t
+SHA1 3692def772d5c265df69f790b95447d60e856d7c t/06-ua.t
+SHA1 1cd05f33dfa6b46f7f9367788151bd56451f3f9e t/07-pgp.t
+SHA1 f54d3a79211a9c9159e6fa49927160f4cac49425 t/09-session.t
+SHA1 8579bfa6196b3aaf925abc6ea4d5f507e9ef3bbe t/09-session/example-session.raw
+SHA1 4ffcacc6a7d919e3a5bb3ae262fd0e20040f26d1 t/12-transform-fu.t
+SHA1 2af7eb5be6ee05b4b9804f8848986ca91eeb478d t/13-transform-xslt.t
+SHA1 ab0371ec06c7ec75a419a4d0b96df59caa3424c3 t/30-transform-rfc4930-common.t
+SHA1 efcd12e4822e0a586dc174002e38dfb21591f75c t/31-transform-rfc4931-domain.t
+SHA1 890976dd17686d8e766e2fa28f06834970121a59 t/32-transform-rfc4932-host.t
+SHA1 7add3e1bd0e21d6964d669e5be3fc3ecdb480329 t/33-transform-rfc4933-contact.t
+SHA1 4897b5eb6833340f84f3151f1959df5ae5e07efe t/90-pod-syntax.t
+SHA1 1b0aa297ec03576837bf66d2291907fbce73584d t/91-pod-coverage.t
+SHA1 e29db398ec80840891198c8de898bdc2b7e0ae8a t/92-license.t
+SHA1 03c705f747c2f9c8f9f68af556ed6f799c966561 t/93-perltidy.t
+SHA1 800acaa0d4e12382dec4db44d137a1b0a132bb5b t/Log4test.pm
+-----BEGIN PGP SIGNATURE-----
+Version: GnuPG v1.4.9 (GNU/Linux)
+
+iEYEARECAAYFAkvrtmYACgkQ/AZAiGayWEMo+ACffpLR9GyFiOhebTBC8wF2cPdf
+/4wAoJam6rJbn7LfKm94FVuGb5fRorem
+=YY0E
+-----END PGP SIGNATURE-----

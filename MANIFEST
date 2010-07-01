@@ -6,6 +6,7 @@ inc/Module/Install/Can.pm
 inc/Module/Install/Fetch.pm
 inc/Module/Install/Makefile.pm
 inc/Module/Install/Metadata.pm
+inc/Module/Install/Scripts.pm
 inc/Module/Install/Win32.pm
 inc/Module/Install/WriteAll.pm
 lib/SRS/EPP/Changes.pod
@@ -28,6 +29,8 @@ lib/SRS/EPP/Command/Logout.pm
 lib/SRS/EPP/Command/PayloadClass.pm
 lib/SRS/EPP/Command/Renew.pm
 lib/SRS/EPP/Command/Renew/Domain.pm
+lib/SRS/EPP/Command/Transfer.pm
+lib/SRS/EPP/Command/Transfer/Domain.pm
 lib/SRS/EPP/Command/Update.pm
 lib/SRS/EPP/Message.pm
 lib/SRS/EPP/OpenPGP.pm
@@ -54,6 +57,7 @@ MANIFEST			This list of files
 MANIFEST.SKIP
 META.yml
 README
+SIGNATURE
 SubmittingPatches
 t/00-load.t
 t/01-listener.t
@@ -105,6 +109,10 @@ t/mappings/11a-create-contact-simple.yaml
 t/mappings/11b-create-contact-full.yaml
 t/mappings/11c-create-contact-srs-error.yaml
 t/mappings/11d-create-contact-reject-company.yaml
+t/mappings/13a-transfer-request-simple.yaml
+t/mappings/13b-transfer-request-notfound.yaml
+t/mappings/13c-transfer-request-error.yaml
+t/mappings/13o-transfer-query.yaml
 t/Mock.pm
 t/templates/check-contact.tt
 t/templates/check-domain.tt
@@ -119,6 +127,7 @@ t/templates/info-domain.tt
 t/templates/login.tt
 t/templates/logout.tt
 t/templates/renew-domain.tt
+t/templates/transfer-domain-query.tt
 t/templates/transfer-domain.tt
 t/templates/update-domain.tt
 t/XMLMappingTests.pm
