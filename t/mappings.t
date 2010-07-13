@@ -30,7 +30,9 @@ use Mock;
 use XMLMappingTests;
 use t::Log4test;
 
-our @testfiles = XMLMappingTests::find_tests;
+my @files = map { s|^t/||; $_ } @ARGV;
+
+our @testfiles = @files ? @files : XMLMappingTests::find_tests;
 
 # get an XML parser
 my $parser = XML::LibXML->new();
@@ -42,10 +44,15 @@ my $tt = Template->new({
 });
 
 # create an SRS::EPP::Session
+my $proxy = Mock::Proxy->new();
+$proxy->rfc_compliant_ssl(1);
 my $session = SRS::EPP::Session->new(
     event => undef,
-    proxy => Mock::Proxy->new(),
+    proxy => $proxy,
     backend_url => '',
+    user => 11,
+    peerhost => '192.168.1.1',
+    peer_cn => 'peer_cn',
 );
 
 for my $testfile ( sort @testfiles ) {
@@ -118,11 +125,11 @@ for my $testfile ( sort @testfiles ) {
       }
     }
 
-    ok( $messages[0]->isa('SRS::EPP::Response'),"Final response has sensible class"); 
-    if ( $messages[0]->isa('SRS::EPP::Response') ) {
+    my $epp_response = $messages[0];
+    ok( $epp_response->isa('SRS::EPP::Response'),"Final response has sensible class"); 
+    if ( $epp_response->isa('SRS::EPP::Response') ) {
         # ToDo: we'll have to do something if there are multiple msgs returned
-        my $resp = $messages[0];
-        my $xml = $resp->to_xml();
+        my $xml = $epp_response->to_xml();
 
         # print out the XML
         print "EPP response = $xml\n" if $VERBOSE;

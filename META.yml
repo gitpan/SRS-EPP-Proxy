@@ -2,12 +2,8 @@
 abstract: 'EPP <=> SRS XML proxy server'
 author:
   - 'Catalyst SRS Team <team-srs@catalyst.net.nz>'
-build_requires:
-  ExtUtils::MakeMaker: 6.42
-configure_requires:
-  ExtUtils::MakeMaker: 6.42
 distribution_type: module
-generated_by: 'Module::Install version 0.95'
+generated_by: 'Module::Install version 0.77'
 license: artistic
 meta-spec:
   url: http://module-build.sourceforge.net/META-spec-v1.4.html
@@ -30,10 +26,9 @@ requires:
   MooseX::SimpleConfig: 0
   MooseX::Singleton: 0
   Net::SSLeay::OO: 0
-  PRANG: 0.09
-  XML::EPP: 0.03
-  XML::SRS: 0.03
+  PRANG: 0.11
+  XML::Assert: 0.02
+  XML::EPP: 0.05
+  XML::SRS: 0.06
   perl: 5.008005
-resources:
-  license: http://opensource.org/licenses/artistic-license.php
-version: 0.12
+version: 0.21

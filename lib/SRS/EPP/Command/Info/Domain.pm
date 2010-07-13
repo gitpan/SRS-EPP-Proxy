@@ -12,12 +12,6 @@ use Data::Dumper;
 use XML::EPP::Common;
 use XML::EPP::Domain::NS::List;
 
-my $status_map = {
-    Active => 'ok',
-    PendingRelease => 'pendingRenew',
-    # shouldn't ever need this one
-    Available => '',
-};
 
 # for plugin system to connect
 sub xmlns {
@@ -66,70 +60,59 @@ method notify( SRS::EPP::SRSResponse @rs ) {
     my $payload = $self->message->message->argument->payload;
     # print Dumper($domain);
 
-    # Status:
-    my @status;
-    if ( $domain->delegate() == 0 ) {
-        push @status, 'inactive';
-    }
-    elsif ( $domain->status eq 'PendingRelease' ) {
-        push @status, 'pendingDelete';
-    }
-    elsif ( defined $domain->locked_date() ) {
-        push @status, qw( serverDeleteProhibited serverHold serverRenewProhibited serverTransferProhibited serverUpdateProhibited );
-    }
-    else {
-        push @status, 'ok';
-    }
-
-    # get some things out to make it easier on the eye below
-    # @status = map { XML::EPP::Domain::Status->new( status => $_ ) } @status;
-    my @nameservers = map { $_->fqdn } @{$domain->nameservers->nameservers};
-
-    my $r = XML::EPP::Domain::Info::Response->new(
-        name => $payload->name->value,
-        roid => substr(md5_hex($payload->name->value), 0, 12) . '-DOM',
-        # status => \@status,
-        status => [
-            map { XML::EPP::Domain::Status->new( status => $_ ) } @status
-        ],
-        # registrant # skipping, since contacts can't be seen from EPP
-        # contact    # skipping, since contacts can't be seen from EPP
-        ns => XML::EPP::Domain::NS::List->new( ns => [ @nameservers ] ),
-        # host # not doing this
-        client_id => $domain->registrar_id(), # clID
-        # crID => '',
-        created => srs_date_to_epp_date($domain->registered_date()), # crDate
-        expiry_date => srs_date_to_epp_date($domain->billed_until()), # exDate
-        # upID
-        updated => srs_date_to_epp_date($domain->audit->when->begin()), # upDate
-        # trDate
-        # authInfo
-    );
-
     return $self->make_response(
-        'Info',
         code => 1000,
-        payload => $r,
+        payload => buildInfoResponse($domain),
     );
 }
 
-sub srs_date_to_epp_date {
-    my ($srs) = @_;
+sub buildInfoResponse {
+  my ($domain) = @_;
 
-    return
-        $srs->year
-        . '-'
-        . $srs->month
-        . '-'
-        . $srs->day
-        . 'T'
-        . $srs->hour
-        . ':'
-        . $srs->minute
-        . ':'
-        . $srs->second
-        . $srs->tz_offset
-    ;
+  # get some things out to make it easier on the eye below
+  my $nsList;
+  if ( $domain->nameservers ) {
+      my @nameservers = map { $_->fqdn } @{$domain->nameservers->nameservers};
+      $nsList = XML::EPP::Domain::NS::List->new( ns => [ @nameservers ] );
+  }
+
+  return XML::EPP::Domain::Info::Response->new(
+      name => $domain->name,
+      roid => substr(md5_hex($domain->name), 0, 12) . '-DOM',
+      status => [ getEppStatuses($domain) ],
+      # registrant # skipping, since contacts can't be seen from EPP
+      # contact    # skipping, since contacts can't be seen from EPP
+      ($nsList ? (ns => $nsList) : ()),
+      # host # not doing this
+      client_id => sprintf("%03d",$domain->registrar_id()), # clID
+      # crID => '',
+      created => ($domain->registered_date())->timestamptz, # crDate
+      expiry_date => ($domain->billed_until())->timestamptz, # exDate
+      # upID
+      updated => ($domain->audit->when->begin())->timestamptz, # upDate
+      # trDate
+      # authInfo
+  );
+}
+
+sub getEppStatuses {
+  my ($domain) = @_;
+
+  my @status;
+  if ( $domain->delegate() == 0 ) {
+      push @status, 'inactive';
+  }
+  elsif ( $domain->status eq 'PendingRelease' ) {
+      push @status, 'pendingDelete';
+  }
+  elsif ( defined $domain->locked_date() ) {
+      push @status, qw( serverDeleteProhibited serverHold serverRenewProhibited serverTransferProhibited serverUpdateProhibited );
+  }
+  else {
+      push @status, 'ok';
+  }
+
+  return map { XML::EPP::Domain::Status->new( status => $_ ) } @status
 }
 
 1;
