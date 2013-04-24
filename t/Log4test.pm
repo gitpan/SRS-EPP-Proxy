@@ -1,14 +1,18 @@
 
-use Getopt::Long;
-
 use Log::Log4perl qw(:easy);
-my $log_level = $ERROR;
-GetOptions(
-	"verbose|v" => sub { $log_level = $INFO },
-	"debug|d" => sub { $log_level = $DEBUG },
-	"trace|t" => sub { $log_level = $TRACE },
-       );
 
-Log::Log4perl->easy_init($log_level);
+my $log_level = $ERROR;
+
+use Scriptalicious;
+
+getopt_lenient();
+
+$log_level = (
+	$main::VERBOSE > 2 ? $TRACE :
+		$main::VERBOSE > 1 ? $DEBUG :
+		$main::VERBOSE > 0 ? $INFO : $FATAL
+);
+
+Log::Log4perl->easy_init({ level => $log_level, layout => "[%p - %C:%L] %m{chomp}%n" });
 
 1;

@@ -1,93 +1,114 @@
-
-
 package SRS::EPP::Command::Create::Contact;
+{
+  $SRS::EPP::Command::Create::Contact::VERSION = '0.22';
+}
 
 use Moose;
+
 extends 'SRS::EPP::Command::Create';
-use MooseX::Method::Signatures;
-use Crypt::Password;
+with 'SRS::EPP::Common::Contact';
+
 use SRS::EPP::Session;
 use XML::EPP::Contact;
 use XML::SRS::TimeStamp;
+use MooseX::Params::Validate;
 
 # for plugin system to connect
 sub xmlns {
-    return XML::EPP::Contact::Node::xmlns();
+	return XML::EPP::Contact::Node::xmlns();
 }
 
-method process( SRS::EPP::Session $session ) {
-  $self->session($session);
+sub process {
+    my $self = shift;
+    
+    my ( $session ) = pos_validated_list(
+        \@_,
+        { isa => 'SRS::EPP::Session' },
+    );
+    
+	$self->session($session);
 
-  my $epp = $self->message;
-  my $message = $epp->message;
-  my $payload = $message->argument->payload;
+	my $epp = $self->message;
+	my $message = $epp->message;
+	my $payload = $message->argument->payload;
+	my $error;
 
+	my $epp_postal_info = $payload->postal_info()
+		or return $self->make_error(
+		code => 2306,
+		message => "Postal information must be provided",
+		);
 
-  my $epp_postal_info = $payload->postal_info();
-  if ( (scalar @$epp_postal_info) != 1 ) {
-    # The SRS doesn't support the US's idea of i18n.  That is
-    # that ASCII=international, anything else=local.
-    # Instead, well accept either form of postalinfo, but throw an 
-    # error if they try to provide both types (because the SRS can't
-    # have two translations for one address)
-    return $self->make_response(code => 2400);
-  }
-  my $postalInfo = $epp_postal_info->[0];
+	if ($error = $self->validate_contact_postal($epp_postal_info)) {
+		return $error;
+	}
 
-  # The SRS doesn't have a 'org' field, we don't want to lose info, so
-  if ( $postalInfo->org ) {
-    return $self->make_response(code => 2306);
-  }
+	my $postal_info = $epp_postal_info->[0];
 
-  # Try to make an SRS address object...
-  my $postalInfoAddr = $postalInfo->addr();
-  my $street = $postalInfoAddr->street();
-  my $address = XML::SRS::Contact::Address->new(
-    address1 => $street->[0],
-    city => $postalInfoAddr->city,
-    region => $postalInfoAddr->sp,
-    cc => $postalInfoAddr->cc,
-    postcode => $postalInfoAddr->pc,
-  );
-  if ( $address ) {
-    if ( $street->[1] ) {
-      $address->address2($street->[1]);
-    }
+	my $address = $self->translate_address($postal_info->addr)
+		or goto error_out;
 
-    # and finally, an SRS update is (hopefully) produced..
-    my $txn = {
-      handle_id => $payload->id(),
-      name => $postalInfo->name(),
-      phone => $payload->voice()->content(),
-      address => $address,
-      email => $payload->email(),
-      action_id => $message->client_id || sprintf("auto.%x",time()),
-    };
-    if ( $payload->fax()->content() ) {
-      $txn->{fax} = $payload->fax()->content();
-    }
-    if ( my $srsTxn =  XML::SRS::Handle::Create->new(%$txn) ) {
-      return $srsTxn;
-    }
-  }
+	my $voice = $payload->voice
+		or return $self->make_error(
+		code => 2306,
+		message => "Voice phone number must be provided",
+		);
 
-  return $self->make_response(code => 2400);
+	if ($error = $self->validate_contact_voice($voice)) {
+		return $error;
+	}
+
+	my $txn = {
+		handle_id => $payload->id(),
+		name => $postal_info->name(),
+		phone => $payload->voice()->content(),
+		address => $address,
+		email => $payload->email(),
+		action_id => $self->client_id || $self->server_id,
+	};
+
+	if ( $payload->fax() && $payload->fax()->content() ) {
+		$txn->{fax} = $payload->fax()->content();
+	}
+
+	my $srsTxn = XML::SRS::Handle::Create->new(%$txn)
+		or goto error_out;
+
+	$self->log_info( "$self: prepared HandleCreate, ActionId = " .$txn->{action_id} );
+
+	return $srsTxn;
+
+error_out:
+
+	# Catch all (possibly not necessary)
+	return $self->make_response(code => 2400);
 }
 
+sub notify {
+    my $self = shift;
+    
+    my ( $rs ) = pos_validated_list(
+        \@_,
+        { isa => 'ArrayRef[SRS::EPP::SRSResponse]' },
+    );    
+    
+	my $message = $rs->[0]->message;
+	my $response = $message->response;
 
-method notify( SRS::EPP::SRSResponse @rs ) {
-  my $epp = $self->message;
-  my $eppMessage = $epp->message;
-  my $eppPayload = $eppMessage->argument->payload;
+	$self->log_info(
+		"$self: Handle ".$response->handle_id
+			." created OK"
+	);
 
-  my $message = $rs[0]->message;
-  my $response = $message->response;
+	my $r = XML::EPP::Contact::Create::Response->new(
+		id => $response->handle_id,
+		created => $message->server_time->timestamptz,
+	);
 
-  if ( $response->isa("XML::SRS::Handle") ) {
-    return $self->make_response(code => 1000);
-  }
-
-  return $self->make_response(code => 2400);
+	return $self->make_response(
+		code => 1000,
+		payload => $r,
+	);
 }
 
 1;

@@ -1,37 +1,68 @@
-#
-# Copyright (C) 2009  NZ Registry Services
-#
-# This program is free software: you can redistribute it and/or modify
-# it under the terms of the Artistic License 2.0 or later.  You should
-# have received a copy of the Artistic License the file COPYING.txt.
-# If not, see <http://www.perlfoundation.org/artistic_license_2_0>
 
-use inc::Module::Install;
+use strict;
+use warnings;
 
-name            ("SRS-EPP-Proxy");
-abstract        ("EPP <=> SRS XML proxy server");
-author          ("Catalyst SRS Team <team-srs\@catalyst.net.nz>");
-version_from	("lib/SRS/EPP/Proxy.pm");
-license         ('artistic');
 
-requires        ("perl" => 5.008005);
-requires        ("Moose" => 0.54);
-requires        ("MooseX::Method::Signatures" => 0);
-requires        ("MooseX::Singleton" => 0);
-requires        ("Net::SSLeay::OO" => 0);
-requires        ("PRANG" => 0.11);
-requires        ("XML::SRS" => 0.06);
-requires        ("XML::EPP" => 0.05);
-requires        ("XML::Assert" => 0.02);
-requires        ("Crypt::Password" => 0);
-requires        ("Module::Pluggable" => 0);
-requires        ("MooseX::SimpleConfig" => 0);
-requires        ("MooseX::Getopt" => 0);
-requires        ("MooseX::Log::Log4perl" => 0);
-requires        ("Log::Dispatch" => 0);
-requires        ("MooseX::Daemonize" => 0);
-requires        ("Event" => 0);
 
-install_script  ("bin/srs-epp-proxy");
+use ExtUtils::MakeMaker 6.30;
 
-&WriteAll;
+
+
+my %WriteMakefileArgs = (
+  "ABSTRACT" => "IETF EPP <=> SRS XML proxy software",
+  "AUTHOR" => "Catalyst SRS Team <team-srs\@catalyst.net.nz>",
+  "BUILD_REQUIRES" => {
+    "XML::Compare" => "0.04"
+  },
+  "CONFIGURE_REQUIRES" => {
+    "ExtUtils::MakeMaker" => "6.30"
+  },
+  "DISTNAME" => "SRS-EPP-Proxy",
+  "EXE_FILES" => [
+    "bin/srs-epp-proxy"
+  ],
+  "LICENSE" => "perl",
+  "NAME" => "SRS::EPP::Proxy",
+  "PREREQ_PM" => {
+    "Crypt::Password" => 0,
+    "Event" => 0,
+    "Log::Dispatch" => 0,
+    "Module::Pluggable" => 0,
+    "Moose" => "1.21",
+    "MooseX::Daemonize" => 0,
+    "MooseX::Getopt" => 0,
+    "MooseX::Log::Log4perl" => 0,
+    "MooseX::Params::Validate" => "0.16",
+    "MooseX::SimpleConfig" => 0,
+    "MooseX::Singleton" => "0.14",
+    "XML::Assert" => "0.02",
+    "XML::EPP" => "0.05",
+    "XML::SRS" => "0.09"
+  },
+  "VERSION" => "0.22",
+  "test" => {
+    "TESTS" => "t/*.t"
+  }
+);
+
+
+unless ( eval { ExtUtils::MakeMaker->VERSION(6.56) } ) {
+  my $br = delete $WriteMakefileArgs{BUILD_REQUIRES};
+  my $pp = $WriteMakefileArgs{PREREQ_PM};
+  for my $mod ( keys %$br ) {
+    if ( exists $pp->{$mod} ) {
+      $pp->{$mod} = $br->{$mod} if $br->{$mod} > $pp->{$mod};
+    }
+    else {
+      $pp->{$mod} = $br->{$mod};
+    }
+  }
+}
+
+delete $WriteMakefileArgs{CONFIGURE_REQUIRES}
+  unless eval { ExtUtils::MakeMaker->VERSION(6.52) };
+
+WriteMakefile(%WriteMakefileArgs);
+
+
+

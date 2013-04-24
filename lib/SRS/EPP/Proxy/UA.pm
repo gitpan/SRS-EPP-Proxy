@@ -1,8 +1,11 @@
 
 package SRS::EPP::Proxy::UA;
+{
+  $SRS::EPP::Proxy::UA::VERSION = '0.22';
+}
 
 use Moose;
-use MooseX::Method::Signatures;
+use MooseX::Params::Validate;
 use LWP::UserAgent;
 use Net::SSLeay::OO;
 use Moose::Util::TypeConstraints;
@@ -12,6 +15,7 @@ use Storable qw(store_fd retrieve_fd);
 with 'MooseX::Log::Log4perl::Easy';
 
 enum __PACKAGE__."::states" => qw(waiting busy ready);
+
 BEGIN {
 	class_type "HTTP::Request";
 	class_type "HTTP::Response";
@@ -39,28 +43,42 @@ has 'state' =>
 	default => "waiting",
 	;
 
-method busy() {
+sub busy {
+    my $self = shift;
+    
 	$self->state eq "busy";
 }
 
-method ready() {
+sub ready {
+    my $self = shift;
+    
 	if ( $self->busy ) {
 		$self->check_reader_ready;
 	}
 	$self->state eq "ready";
 }
-method waiting() {
+
+sub waiting {
+    my $self = shift;
+    
 	$self->state eq "waiting";
 }
 
-method check_reader_ready( Num $timeout = 0 ) {
+sub check_reader_ready {
+    my $self = shift;
+    
+    my ( $timeout ) = pos_validated_list(
+        \@_,
+        { isa => 'Num', default => 0 },
+    );       
+    
 	my $fh = $self->read_fh;
 	my $rin = '';
 	vec($rin, fileno($fh), 1) = 1;
 	my $win = '';
 	my $ein = $rin;
 	my ($nfound) = select($rin, $win, $ein, $timeout);
-	if ( $nfound ) {
+	if ($nfound) {
 		if ( vec($ein, fileno($fh), 1) ) {
 			die "reader handle in error state";
 		}
@@ -86,11 +104,11 @@ sub BUILD {
 		$self->log_trace("forking...");
 		my $pid = fork;
 		defined $pid or die "fork failed; $!";
-		if ( $pid ) {
+		if ($pid) {
 			$self->log_trace(
-"parent, child pid = $pid, reading from ".fileno($rs_rdr)
-	.", writing to ".fileno($rq_wtr)
-			       );
+				"parent, child pid = $pid, reading from ".fileno($rs_rdr)
+					.", writing to ".fileno($rq_wtr)
+			);
 			$self->pid($pid);
 			$self->read_fh($rs_rdr);
 			$self->write_fh($rq_wtr);
@@ -98,9 +116,9 @@ sub BUILD {
 		}
 		else {
 			$self->log_trace(
-"child, I am $$, reading from "
-	.fileno($rq_rdr).", writing to ".fileno($rs_wtr)
-			       );
+				"child, I am $$, reading from "
+					.fileno($rq_rdr).", writing to ".fileno($rs_wtr)
+			);
 			$0 = __PACKAGE__;
 			$self->read_fh($rq_rdr);
 			$self->write_fh($rs_wtr);
@@ -124,21 +142,24 @@ has 'ua' =>
 	isa => "LWP::UserAgent",
 	lazy => 1,
 	default => sub {
-		LWP::UserAgent->new(
-			agent => __PACKAGE__,
-			timeout => 30,  # 'fast' timeout for EPP sessions
-		       )
+	LWP::UserAgent->new(
+		agent => __PACKAGE__,
+		timeout => 30,  # 'fast' timeout for EPP sessions
+		)
 	};
 
-method loop() {
+sub loop {
+    my $self = shift;
+    
 	$SIG{TERM} = sub { exit(0) };
-	while ( 1 ) {
-		$self->log_trace("UA waiting for request");
+	while (1) {
+		$self->log_debug("UA waiting for request");
 		$0 = __PACKAGE__." - idle";
 		my $request = eval { fd_retrieve($self->read_fh) }
 			or do {
-				#$self->log_error("failed to read request; $@");
-				last;
+
+			#$self->log_error("failed to read request; $@");
+			last;
 			};
 		$self->log_debug("sending a request to back-end");
 		$0 = __PACKAGE__." - active";
@@ -152,7 +173,14 @@ method loop() {
 	exit(0);
 }
 
-method request( HTTP::Request $request ) {
+sub request {
+    my $self = shift;
+    
+    my ( $request ) = pos_validated_list(
+        \@_,
+        { isa => 'HTTP::Request' },
+    );           
+    
 	die "sorry, can't handle a request in state '".$self->state."'"
 		unless $self->waiting;
 	$self->log_trace("writing request to child UA socket");
@@ -162,7 +190,9 @@ method request( HTTP::Request $request ) {
 	$self->state("busy");
 }
 
-method get_response() {
+sub get_response {
+    my $self = shift;
+    
 	die "sorry, not ready yet" unless $self->ready;
 	my $response = retrieve_fd($self->read_fh);
 	$self->state("waiting");

@@ -1,6 +1,8 @@
 
-
 package SRS::EPP::Command::Delete;
+{
+  $SRS::EPP::Command::Delete::VERSION = '0.22';
+}
 
 use Moose;
 extends 'SRS::EPP::Command';

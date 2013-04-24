@@ -1,3 +1,4 @@
+
 #!/usr/bin/perl -w
 #
 # test the SRS::EPP::Session class overall
@@ -14,6 +15,7 @@ use Mock;
 use XML::EPP;
 use XML::EPP::Host;
 use XML::SRS;
+use XML::SRS::Keyring;
 
 use t::Log4test;
 
@@ -26,6 +28,16 @@ my $input = do {
 	<$input>
 };
 
+XML::EPP::register_obj_uri(
+	"urn:ietf:params:xml:ns:obj1",
+	"urn:ietf:params:xml:ns:obj2",
+	"urn:ietf:params:xml:ns:obj3",
+);
+
+XML::EPP::register_ext_uri(
+	"http://custom/obj1ext-1.0" => "obj",
+);
+
 my $event = Mock::Event->new();
 my $proxy = Mock::Base->new(rfc_compliant_ssl => 1);
 my $session = SRS::EPP::Session->new(
@@ -36,15 +48,15 @@ my $session = SRS::EPP::Session->new(
 	peerhost => "101.1.5.27",
 	socket => Mock::Base->new,
 	peer_cn => "foobar.client.cert.example.com",
-       );
+);
 
 # 0. test the ->connected event and greeting response
 $session->connected;
 is(@{$session->{event}{io}}, 2, "set up IO watchers OK on connected");
 is_deeply(
-	[$session->event->queued_events], ["output_event"],
+	[$session->event->queued_events], ["signal_handler_timer", "output_event"],
 	"data waiting to be written",
-       );
+);
 
 # let's write to the socket for a bit, until we see an event.  This
 # simulates events from Event etc saying that the output socket is
@@ -53,30 +65,36 @@ is_deeply(
 srand 107;
 $event->loop_until(
 	sub { !@{ $session->output_queue } },
-	[ qw(output_event) ],
+	[qw(signal_handler_timer output_event)],
 	"queued output",
-       );
+);
 
 my $greeting = delete $session->io->{output};
 my $greeting_length = unpack("N", bytes::substr($greeting, 0, 4, ""));
-is(bytes::length($greeting)+4, $greeting_length,
-   "got a full packet back ($greeting_length bytes)");
+is(
+	bytes::length($greeting)+4, $greeting_length,
+	"got a full packet back ($greeting_length bytes)"
+);
 
 is_deeply(
-	[$session->event->queued_events], [ ],
+	[$session->event->queued_events], [],
 	"After issuing greeting, no events waiting"
-       );
-is($session->state, "Waiting for Client Authentication",
-   "RFC5730 session state flowchart state as expected");
+);
+is(
+	$session->state, "Waiting for Client Authentication",
+	"RFC5730 session state flowchart state as expected"
+);
 
 # 1. test that input leads to queued commands
 $session->{io}{input} = $input;
 $event->loop_until(
-	sub { $session->event->queued("process_queue") or
-		      !$session->io->input },
+	sub {
+		$session->event->queued("process_queue") or
+			!$session->io->input;
+	},
 	[qw(input_event)],
 	"queued input",
-	);
+);
 
 is($session->commands_queued, 1, "command is now queued");
 
@@ -85,7 +103,7 @@ $event->loop_until(
 	sub { $event->queued("output_event") },
 	[qw(process_queue input_event send_pending_replies)],
 	"queue processing",
-	);
+);
 
 # this one can jump the queue here...
 my $error;
@@ -95,11 +113,15 @@ do {
 
 # 3. check that we got an error!
 use utf8;
-like($error->message->result->[0]->msg->content,
-     qr/Command syntax error/i,
-     "got an appropriate error");
-is($error->message->tx_id->client_id,
-   "ÄBC-12345", "returned client ID OK");
+like(
+	$error->message->result->[0]->msg->content,
+	qr/not logged in/i,
+	"got an appropriate error"
+);
+is(
+	$error->message->tx_id->client_id,
+	"ÄBC-12345", "returned client ID OK"
+);
 
 # 4. check that the login message results in queued back-end messages
 $event->loop_until(
@@ -108,20 +130,26 @@ $event->loop_until(
 	},
 	[qw(input_event process_queue output_event)],
 	"login produces a backend message",
-	);
+);
 
-ok($session->backend_pending,
-   "login message produced backend messages");
-ok($session->stalled,
-   "waiting for login result before processing further commands");
+ok(
+	$session->backend_pending,
+	"login message produced backend messages"
+);
+ok(
+	$session->stalled,
+	"waiting for login result before processing further commands"
+);
 my $rq = $session->next_message;
 is(@{$rq->parts}, 3, "login makes 3 messages");
 is_deeply(
 	[ map { $_->message->root_element } @{$rq->parts} ],
-	[ qw(RegistrarDetailsQry AccessControlListQry
-	     AccessControlListQry) ],
+	[
+		qw(RegistrarDetailsQry AccessControlListQry
+			AccessControlListQry)
+	],
 	"login message transform",
-       );
+);
 
 ok($event->queued("send_backend_queue"), "Session wants to send", );
 
@@ -130,16 +158,25 @@ use Crypt::Password;
 # fake some responses.
 $event->ignore("send_backend_queue");
 
-# these objects are missing fields and would not serialize; but for
-# this test it doesn't matter.  We must only provide the attributes
-# marked "required"
+my $password = XML::SRS::Password->new(
+    crypted => Crypt::Password->new("foo-BAR2")."",
+);
+
+my $contact = XML::SRS::Contact->new(
+	name => "Bob",
+	email => 'bob@gmail.com',
+);
 my @action_rs = (
 	XML::SRS::Registrar->new(
 		id => "123",
 		name => "Model Registrar",
 		account_reference => "xx",
-		epp_auth => password("foo-BAR2"),
-	       ),
+		epp_auth => $password,
+		contact_public => $contact,
+		contact_private => $contact,
+		contact_technical => $contact,
+		keyring => XML::SRS::Keyring->new(),
+	),
 	XML::SRS::ACL->new(
 		Resource => "epp_connect",
 		List => "allow",
@@ -150,9 +187,9 @@ my @action_rs = (
 				Address => "101.1.5.0/24",
 				RegistrarId => "90",
 				Comment => "Test Registrar Netblock",
-			       ),
-		       ],
-	       ),
+			),
+		],
+	),
 	XML::SRS::ACL->new(
 		Resource => "epp_client_certs",
 		List => "allow",
@@ -163,10 +200,10 @@ my @action_rs = (
 				DomainName => "*.client.cert.example.com",
 				RegistrarId => "90",
 				Comment => "Test Registrar Key",
-			       ),
-		       ],
-	       ),
-       );
+			),
+		],
+	),
+);
 
 use MooseX::TimestampTZ;
 
@@ -178,10 +215,10 @@ my @rs = map {
 		by_id => "123",
 		server_time => timestamptz,
 		response => shift(@action_rs),
-	       )
+		)
 	}
 	map {
-		$_->message->root_element
+	$_->message->root_element
 	}
 	@{$rq->parts};
 
@@ -189,23 +226,26 @@ my $srs_rs = XML::SRS::Response->new(
 	version => "auto",
 	results => \@rs,
 	RegistrarId => 90,
-       );
+);
 
 my $rs_tx = SRS::EPP::SRSMessage->new( message => $srs_rs );
 $session->be_response($rs_tx);
 
 # now, with the response there, process_replies should be ready.
-ok($event->queued("process_responses"),
-   "Session wants to process that response",
-  );
+ok(
+	$event->queued("process_responses"),
+	"Session wants to process that response",
+);
 
 my $response;
 $event->loop_until(
 	sub { $response = $session->io->get_packet },
-	[qw(send_pending_replies input_event process_queue
-	    process_responses output_event)],
+	[
+		qw(send_pending_replies input_event process_queue
+			process_responses output_event)
+	],
 	"response produced",
-       );
+);
 
 is($response->message->result->[0]->code, 1000, "Login successful!");
 
@@ -220,7 +260,7 @@ my $failed = 0;
 event:
 while ( my @events = $session->event->queued_events ) {
 	$session->input_event if $session->io->input;
-	for my $event ( @events ) {
+	for my $event (@events) {
 		unless ($event ~~ @expected) {
 			fail("weren't expecting $event");
 			$failed = 1;

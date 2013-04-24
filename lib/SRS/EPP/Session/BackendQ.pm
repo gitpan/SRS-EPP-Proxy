@@ -1,12 +1,15 @@
 
 package SRS::EPP::Session::BackendQ;
+{
+  $SRS::EPP::Session::BackendQ::VERSION = '0.22';
+}
 
 use SRS::EPP::SRSRequest;
 use SRS::EPP::SRSResponse;
 use SRS::EPP::Command;
 
 use Moose;
-use MooseX::Method::Signatures;
+use MooseX::Params::Validate;
 
 has 'queue' =>
 	is => "ro",
@@ -38,7 +41,15 @@ has 'session' =>
 	;
 
 # add a response corresponding to a request
-method queue_backend_request( SRS::EPP::Command $cmd, SRS::EPP::SRSRequest @rq ) {
+sub queue_backend_request {
+    my $self = shift;
+    
+    my ( $cmd ) = pos_validated_list(
+        [shift],
+        { isa => 'SRS::EPP::Command' },
+    );
+    my @rq = @_;
+    
 	push @{ $self->queue }, \@rq;
 	push @{ $self->responses }, [];
 	push @{ $self->owner }, $cmd;
@@ -46,15 +57,27 @@ method queue_backend_request( SRS::EPP::Command $cmd, SRS::EPP::SRSRequest @rq )
 
 use List::Util qw(sum);
 
-method queue_size() {
+sub queue_size {
+    my $self = shift;
+    
 	sum 0, map { scalar @$_ } @{$self->queue};
 }
-method queue_flat() {
-	map { @$_ } @{$self->queue};
+
+sub queue_flat {
+    my $self = shift;
+    
+	map {@$_} @{$self->queue};
 }
 
 # get the next N backend messages to be sent; marks them as sent
-method backend_next( Int $how_many = 1 ) {
+sub backend_next {
+    my $self = shift;
+    
+    my ( $how_many ) = pos_validated_list(
+        \@_,
+        { isa => 'Int', default => 1 },
+    );    
+    
 	return unless $how_many;
 	my $sent = $self->sent;
 	my $waiting = $self->queue_size - $sent;
@@ -64,7 +87,9 @@ method backend_next( Int $how_many = 1 ) {
 	return @rv;
 }
 
-method backend_pending() {
+sub backend_pending {
+    my $self = shift;
+    
 	my $sent = $self->sent;
 	my $waiting = $self->queue_size - $sent;
 	return $waiting;
@@ -73,8 +98,15 @@ method backend_pending() {
 # add a response corresponding to a request - must be in order as
 # there is no other way to correlate read-only responses with their
 # requests (no client_tx_id in SRS requests)
-method add_backend_response( SRS::EPP::SRSRequest $request, SRS::EPP::SRSResponse $response )
-{
+sub add_backend_response {
+    my $self = shift;
+    
+    my ( $request, $response ) = pos_validated_list(
+        \@_,
+        { isa => 'SRS::EPP::SRSRequest' },
+        { isa => 'SRS::EPP::SRSResponse' },
+    );        
+    
 	my $rq_a = $self->queue->[0];
 	my $rs_a = $self->responses->[0];
 	for ( my $i = 0; $i <= $#$rq_a; $i++ ) {
@@ -84,14 +116,18 @@ method add_backend_response( SRS::EPP::SRSRequest $request, SRS::EPP::SRSRespons
 	}
 }
 
-method backend_response_ready() {
+sub backend_response_ready {
+    my $self = shift;
+    
 	my $rq_a = $self->queue->[0]
 		or return;
 	my $rs_a = $self->responses->[0];
 	@$rq_a == @$rs_a;
 }
 
-method dequeue_backend_response() {
+sub dequeue_backend_response {
+    my $self = shift;
+    
 	if ( $self->backend_response_ready ) {
 		my $rq_a = shift @{ $self->queue };
 		my $owner = shift @{ $self->owner };
@@ -104,15 +140,35 @@ method dequeue_backend_response() {
 		}
 		$self->sent($sent);
 
-		if ( wantarray ) {
+		if (wantarray) {
 			($owner, @$rs_a);
 		}
 		else {
-			$owner->notify(@$rs_a);
+			$rs_a;
 		}
 	}
 	else {
 		();
+	}
+}
+
+# Get the command object that 'owns' a SRS request
+sub get_owner_of_request {
+    my $self = shift;
+    
+    my ( $request ) = pos_validated_list(
+        \@_,
+        { isa => 'SRS::EPP::SRSRequest' },
+    );     
+    
+	my @queue = @{ $self->queue };
+	for my $i (0 .. $#queue) {
+		next unless ref $queue[$i] eq 'ARRAY';
+		foreach my $rq (@{$queue[$i]}) {
+			if ($rq->message->unique_id eq $request->message->unique_id) {
+				return $self->owner->[$i];	
+			}	
+		}
 	}
 }
 

@@ -1,6 +1,8 @@
 
-
 package SRS::EPP::Command::Renew;
+{
+  $SRS::EPP::Command::Renew::VERSION = '0.22';
+}
 
 use Moose;
 extends 'SRS::EPP::Command';

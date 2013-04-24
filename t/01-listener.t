@@ -9,10 +9,23 @@ our $have_v6;
 
 use t::Log4test;
 
-BEGIN {
-	$have_v6 = eval "use IO::Socket::INET6; 1";
-}
+use Test::More qw(no_plan);
 
+BEGIN {
+	my $sock = eval {
+    use if $] < 5.014, "Socket6";
+		require IO::Socket::INET6;
+		IO::Socket::INET6->new(
+			Listen    => 1,
+			LocalAddr => '::1',
+			LocalPort => int(rand(60000)+1024),
+			Proto     => 'tcp',
+		) || diag $@;
+	};
+	if ( $sock or $!{EADDRINUSE} ) {
+		$have_v6 = 1;
+	}
+}
 sub try_connect {
 	my ($address, $port) = @_;
 	my $package = "IO::Socket::INET";
@@ -24,7 +37,7 @@ sub try_connect {
 		PeerPort => $port,
 		Proto => "tcp",
 		Timeout => 1,
-	       )
+		)
 		or die "failed to connect to $address:$port; $!";
 	$socket->shutdown(1);
 }
@@ -32,7 +45,7 @@ sub try_connect {
 our ($rfd, $wfd);
 
 sub try_connect_loop {
-	while ( <$rfd> ) {
+	while (<$rfd>) {
 		my ($addr, $port_num) = m{(.*) (\d+)} or next;
 		&try_connect($addr, $port_num);
 	}
@@ -50,7 +63,6 @@ BEGIN {
 	}
 }
 
-use Test::More qw(no_plan);
 use IO::Handle;
 
 BEGIN { use_ok("SRS::EPP::Proxy::Listener") }
@@ -60,7 +72,7 @@ $wfd->autoflush(1);
 # test v4
 my $listener =  SRS::EPP::Proxy::Listener->new(
 	listen => [ "localhost:2047", "localhost:2048" ],
-       );
+);
 $listener->init;
 pass("init listener OK");
 
@@ -80,8 +92,8 @@ SKIP:{
 		1 unless $have_v6;
 
 	my $listener = SRS::EPP::Proxy::Listener->new(
-		listen => [ "[::]:2047" ],
-	       );
+		listen => ["[::]:2047"],
+	);
 	$listener->init;
 	pass("listen on a v6 alias");
 	print $wfd "127.0.0.1 2047\n";

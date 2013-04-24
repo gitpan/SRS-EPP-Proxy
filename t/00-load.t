@@ -51,7 +51,7 @@ while (@modules) {
 	for my $module ( sort @winners ) {
 		my @fail;
 		local ( $SIG{__WARN__} ) = sub {
-			push @fail, join " ", @_;
+			push @fail, join " ", @_;			
 			warn "# oh look a warning: @_";
 		};
 		use_ok($module);

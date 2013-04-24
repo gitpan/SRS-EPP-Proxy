@@ -11,6 +11,9 @@ use strict;
 use warnings;
 
 package SRS::EPP::Message;
+{
+  $SRS::EPP::Message::VERSION = '0.22';
+}
 use Moose;
 
 has 'xml' =>
@@ -29,6 +32,26 @@ sub message_trigger { }
 has 'error' =>
 	is => "rw",
 	;
+
+use Scalar::Util qw(refaddr);
+
+use overload '""' => sub {
+	my $self = shift;
+	my $class = ref $self;
+	$class =~ s{SRS::EPP::}{};
+	my @bits = map { lc $_ } split "::", $class;
+	my @ids = eval{ $self->ids };
+	if ( !@ids ) {
+		@ids = sprintf("0x%x",(0+$self));
+	}
+	push @bits, @ids;
+	s{:}{\xff1a}g for @bits;
+	join ":", @bits
+	},
+	'0+' => sub {
+	refaddr(shift);
+	},
+	fallback => 1;
 
 no Moose;
 __PACKAGE__->meta->make_immutable;

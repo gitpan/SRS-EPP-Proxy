@@ -1,6 +1,8 @@
 
-
 package SRS::EPP::Command::Info;
+{
+  $SRS::EPP::Command::Info::VERSION = '0.22';
+}
 
 use Moose;
 extends 'SRS::EPP::Command';

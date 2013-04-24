@@ -1,8 +1,11 @@
 
 package SRS::EPP::Session::CmdQ;
+{
+  $SRS::EPP::Session::CmdQ::VERSION = '0.22';
+}
 
 use Moose;
-use MooseX::Method::Signatures;
+use MooseX::Params::Validate;
 use SRS::EPP::Command;
 use SRS::EPP::Response;
 
@@ -24,13 +27,21 @@ has 'next' =>
 	default => 0,
 	traits => ['Number'],
 	handles   => {
-		add_next => 'add',
+	add_next => 'add',
 	},
 	;
 
-method next_command() {
+sub next_command {
+    my $self = shift;
+    
 	my $q = $self->queue;
 	my $next = $self->next;
+	while ( $self->responses->[$next] ) {
+
+		# no processing needed?  skip
+		$self->add_next(1);
+		$next++;
+	}
 	if ( my $item = $q->[$next] ) {
 		$self->add_next(1);
 		return $item;
@@ -40,25 +51,46 @@ method next_command() {
 	}
 }
 
-method commands_queued() {
+sub commands_queued {
+    my $self = shift;
+    
 	my $q = $self->queue;
 	return scalar(@$q);
 }
 
-method queue_command( SRS::EPP::Command $cmd ) {
+sub queue_command {
+    my $self = shift;
+    
+    my ( $cmd ) = pos_validated_list(
+        \@_,
+        { isa => 'SRS::EPP::Command' },
+    );        
+    
 	push @{ $self->queue }, $cmd;
 	push @{ $self->responses }, undef;
 }
 
 # with a command object, place a response at the same place in the queue
-method add_command_response( SRS::EPP::Response $response, SRS::EPP::Command $cmd? )
-{
+sub add_command_response {
+    my $self = shift;
+    
+    my ( $response, $cmd ) = pos_validated_list(
+        \@_,
+        { isa => 'SRS::EPP::Response' },
+        { isa => 'SRS::EPP::Command', optional => 1 },
+    );            
+    
+    
 	my $q = $self->queue;
 	my $rs = $self->responses;
 	my $ok;
 	for ( my $i = 0; $i <= $#$q; $i++ ) {
-		if ( ($cmd and $q->[$i] == $cmd) or
-			!defined $rs->[$i] ) {
+		if (
+			($cmd and $q->[$i] == $cmd)
+			or
+			!defined $rs->[$i]
+			)
+		{
 			$rs->[$i] = $response;
 			$ok = 1;
 			last;
@@ -67,16 +99,22 @@ method add_command_response( SRS::EPP::Response $response, SRS::EPP::Command $cm
 	confess "Could not queue response, not found" if !$ok;
 }
 
-method response_ready() {
+sub response_ready {
+    my $self = shift;
+    
 	defined($self->responses->[0]);
 }
 
-method dequeue_response() {
+sub dequeue_response {
+    my $self = shift;
+    
 	if ( $self->response_ready ) {
 		my $cmd = shift @{ $self->queue };
 		my $response = shift @{ $self->responses };
-		$self->add_next(-1);
-		if ( wantarray ) {
+		if ( $self->next ) {
+			$self->add_next(-1);
+		}
+		if (wantarray) {
 			($response, $cmd);
 		}
 		else {

@@ -8,14 +8,22 @@
 # If not, see <http://www.perlfoundation.org/artistic_license_2_0>
 
 package SRS::EPP::Command;
+{
+  $SRS::EPP::Command::VERSION = '0.22';
+}
 
 use Moose;
-use MooseX::Method::Signatures;
-use Moose::Util::TypeConstraints;
+use MooseX::Params::Validate;
+use Moose::Util::TypeConstraints qw(subtype coerce as where class_type);
+use Carp;
 
 extends 'SRS::EPP::Message';
 
+with 'MooseX::Log::Log4perl::Easy';
+
 use XML::EPP;
+use XML::SRS::Error;
+
 has "+message" =>
 	isa => "XML::EPP",
 	;
@@ -28,12 +36,12 @@ sub rebless_class {
 	if ( !$map ) {
 		$map = {
 			map {
-				$_->can("match_class") ?
-					( $_->match_class => $_ )
-						: ();
-			}# map { print "rebless_class checking plugin $_\n"; $_ }
+				$_->can("match_class")
+					? ( $_->match_class => $_ )
+					: ();
+				}# map { print "rebless_class checking plugin $_\n"; $_ }
 				grep m{${\(__PACKAGE__)}::[^:]*$},
-				__PACKAGE__->plugins,
+			__PACKAGE__->plugins,
 		};
 	}
 	$map->{ref $object};
@@ -45,15 +53,15 @@ sub action_class {
 	if ( !$action_classes ) {
 		$action_classes = {
 			map {
-				$_->can("action") ?
-					($_->action => $_)
-						: ();
-			}# map { print "action_class checking plugin $_\n"; $_ }
+				$_->can("action")
+					? ($_->action => $_)
+					: ();
+				}# map { print "action_class checking plugin $_\n"; $_ }
 				grep m{^${\(__PACKAGE__)}::[^:]*$},
 			__PACKAGE__->plugins,
 		};
 	}
-	$action_classes->{ $action };
+	$action_classes->{$action};
 }
 
 sub REBLESS {
@@ -65,11 +73,17 @@ sub BUILD {
 	if ( my $epp = $self->message ) {
 		my $class;
 		$class = rebless_class( $epp->message );
-		if ( !$class and $epp->message and
-			     $epp->message->can("action") ) {
+		if (
+			!$class
+			and $epp->message
+			and
+			$epp->message->can("action")
+			)
+		{
 			$class = action_class($epp->message->action);
 		}
-		if ( $class ) {
+		if ($class) {
+
 			#FIXME: use ->meta->rebless_instance
 			bless $self, $class;
 			$self->REBLESS;
@@ -77,9 +91,16 @@ sub BUILD {
 	}
 }
 
-method simple() { 0 }
-method authenticated() { 1 }
-method done() { 1 }
+sub simple { 0 }
+sub authenticated { 1 }
+sub done { 1 }
+
+# Indicates whether we'd normally expect multiple responses to be returned to the client
+#  e.g. check domain allows multiple domains to be checked at once, and therefore multiple
+#  responses, whereas info domain is only one response. This is used to decide whether we
+#  return multiple SRS errors back to the client (as some actions that map to multiple
+#  SRS queries only want to return at most one error to the client)
+sub multiple_responses { 0 }
 
 BEGIN {
 	class_type "SRS::EPP::Session";
@@ -96,9 +117,17 @@ has 'server_id' =>
 	is => "rw",
 	isa => "XML::EPP::trIDStringType",
 	lazy => 1,
+	predicate => "has_server_id",
 	default => sub {
-		my $self = shift;
-		$self->session->new_server_id;
+	my $self = shift;
+	my $session = $self->session;
+	if ($session) {
+		$session->new_server_id;
+	}
+	else {
+		our $counter = "aaaa";
+		$counter++;
+	}
 	}
 	;
 
@@ -107,21 +136,24 @@ BEGIN {
 }
 
 # process a simple message - the $session is for posting back events
-method process( SRS::EPP::Session $session ) {
+sub process {
+    my $self = shift;
+    
+    my ( $session ) = pos_validated_list(
+        \@_,
+        { isa => 'SRS::EPP::Session' },
+    );    
+    
 	$self->session($session);
 
 	# default handler is to return an unimplemented message
 	return $self->make_response(code => 2101);
 }
 
-method notify( SRS::EPP::SRSResponse @rs ) {
-	my $result;
-	if ( my $server_id = eval {
-		$result = $rs[0]->message;
-		$result->fe_id.",".$result->unique_id
-	} ) {
-		$self->server_id($server_id);
-	}
+sub notify {
+    my $self = shift;
+    
+	return $self->make_response(code => 2400);
 }
 
 sub make_response {
@@ -134,9 +166,57 @@ sub make_response {
 	my %fields = @_;
 	$fields{client_id} ||= $self->client_id if $self->has_client_id;
 	$fields{server_id} ||= $self->server_id;
+	$self->log_debug("making a response: @{[%fields]}")
+		if $self->log->is_debug;
 	$type->new(
 		%fields,
+	);
+}
+
+# this one is for convenience in returning errors
+sub make_error {
+    my $self = shift;
+    
+    my ( $code, $message, $value, $reason, $exception ) = validated_list(
+        \@_,
+        code => { isa => 'Int' },
+        message => { isa => 'Str', optional => 1  },
+        value => { isa => 'Str', optional => 1 },
+        reason => { isa => 'Str', optional => 1 },
+        exception => { optional => 1 },
+    );       
+    
+	if ( defined $reason ) {
+		$exception ||= XML::EPP::Error->new(
+			value => $value//"",
+			reason => $reason,
 		);
+	}
+
+	return $self->make_response(
+		Error => (
+			($code ? (code => $code) : ()),
+			($exception ? (exception => $exception) : ()),
+			($message ? (extra => $message) : ()),
+		),
+	);
+}
+
+# this one is intended for commands to override particular error
+# cases, so must use a simpler calling convention.
+sub make_error_response {
+    my $self = shift;
+    
+    my ( $srs_error ) = pos_validated_list(
+        \@_,
+        { isa => 'XML::SRS::Error|ArrayRef[XML::SRS::Error]' },
+    );    
+    
+	return SRS::EPP::Response::Error->new(
+		server_id => $self->server_id,
+		($self->client_id ? (client_id => $self->client_id) : () ),
+		exception => $srs_error,
+	);
 }
 
 has "client_id" =>
@@ -157,6 +237,14 @@ use Module::Pluggable
 	require => 1,
 	search_path => [__PACKAGE__],
 	;
+
+sub ids {
+	my $self = shift;
+	return (
+		$self->server_id,
+		$self->client_id||(),
+	);
+}
 
 __PACKAGE__->plugins;
 
